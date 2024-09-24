@@ -1,4 +1,4 @@
-package io.job4j;
+package io.job4j.concurrent;
 
 import java.util.stream.IntStream;
 
