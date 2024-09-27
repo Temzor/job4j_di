@@ -83,9 +83,7 @@ public class SingleLockListTest {
             }
         });
 
-        Thread modifyingThread = new Thread(() -> {
-            list.add(5);
-        });
+        Thread modifyingThread = new Thread(() -> list.add(5));
 
         iteratorThread.start();
         modifyingThread.start();
