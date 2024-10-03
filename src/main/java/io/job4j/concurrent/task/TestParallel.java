@@ -15,7 +15,7 @@ import java.util.*;
  */
 
 public class TestParallel {
-    public static void main(String[] args) throws InterruptedException, TestException {
+    public static void main(String[] args) throws InterruptedException {
         long start = System.currentTimeMillis();
 
         parallelThreaded();
