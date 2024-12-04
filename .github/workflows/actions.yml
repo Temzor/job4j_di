@@ -1,0 +1,24 @@
+name: My Activity
+
+on:
+  schedule:
+    - cron: '0 10-18 * * 1-5' # Запускается каждый час с 10:00 до 18:00 с понедельника по пятницу
+
+jobs:
+  generate-activity:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Generate commit
+      run: |
+        echo "Generating commit at $(date)" >> activity.txt
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add activity.txt
+        git commit -m "Generated activity at $(date)"
+        git push origin master
+      env:
+        GITHUB_TOKEN: ${{ secrets.SC_REP }}
