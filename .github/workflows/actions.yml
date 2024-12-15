@@ -21,4 +21,4 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add activity.txt
         git commit -m "Generated activity at $(date)" || echo "No changes to commit"
-        git push origin HEAD:master
+        git push https://${{ secrets.LAST_90 }}@github.com/Temzor/job4j_di.git HEAD:master
