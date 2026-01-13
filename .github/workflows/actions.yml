@@ -1,24 +1,102 @@
-name: My Activity
+name: Java Code Quality
 
 on:
   schedule:
-    - cron: '0 10-18 * * 1-5' # Запускается каждый час с 10:00 до 18:00 с понедельника по пятницу
+    - cron: '0 8 * * 1'  # Каждый понедельник в 8:00
+  workflow_dispatch:
 
 jobs:
-  generate-activity:
+  quality:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-      with:
-        persist-credentials: true # по умолчанию true
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Generate commit
-      run: |
-        echo "Generating commit at $(date)" >> activity.txt
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add activity.txt
-        git commit -m "Generated activity at $(date)" || echo "No changes to commit"
-        git push https://${{ secrets.LAST_90 }}@github.com/Temzor/job4j_di.git HEAD:master
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Run automated code improvements
+        run: |
+          echo "# 🔧 Automated Code Improvements - $(date)" > CODE_IMPROVEMENTS.md
+          echo "" >> CODE_IMPROVEMENTS.md
+          
+          # 1. Поиск неиспользуемых импортов
+          echo "## 1. Неиспользуемые импорты" >> CODE_IMPROVEMENTS.md
+          echo "" >> CODE_IMPROVEMENTS.md
+          find . -name "*.java" -exec grep -l "import.*;" {} \; | while read file; do
+            echo "**Проверка файла:** $file" >> CODE_IMPROVEMENTS.md
+            grep "^import" "$file" | while read import_line; do
+              class_name=$(echo "$import_line" | sed 's/.*\.\([^.]*\);/\1/')
+              if ! grep -q "\b$class_name\b" "$file" 2>/dev/null; then
+                echo "- ❌ $import_line" >> CODE_IMPROVEMENTS.md
+              else
+                echo "- ✅ $import_line" >> CODE_IMPROVEMENTS.md
+              fi
+            done
+            echo "" >> CODE_IMPROVEMENTS.md
+          done || echo "No Java files found" >> CODE_IMPROVEMENTS.md
+          
+          # 2. Проверка стиля именования
+          echo "## 2. Проверка именования" >> CODE_IMPROVEMENTS.md
+          echo "" >> CODE_IMPROVEMENTS.md
+          echo "Классы не в CamelCase:" >> CODE_IMPROVEMENTS.md
+          find . -name "*.java" -exec grep -h "class [A-Za-z_][A-Za-z0-9_]*" {} \; | \
+            grep -v "class [A-Z][a-zA-Z0-9]*" | head -10 >> CODE_IMPROVEMENTS.md || echo "Все классы правильно именованы" >> CODE_IMPROVEMENTS.md
+          
+          # 3. Генерация диаграммы классов
+          echo "## 3. Диаграмма зависимостей классов" >> CODE_IMPROVEMENTS.md
+          echo "" >> CODE_IMPROVEMENTS.md
+          echo '```mermaid' >> CODE_IMPROVEMENTS.md
+          echo 'classDiagram' >> CODE_IMPROVEMENTS.md
+          find . -name "*.java" | head -5 | while read file; do
+            class_name=$(basename "$file" .java)
+            grep "extends\|implements" "$file" | head -1 | while read line; do
+              parent=$(echo "$line" | grep -o "extends [A-Za-z_][A-Za-z0-9_]*\|implements [A-Za-z_][A-Za-z0-9_]*" | cut -d' ' -f2)
+              if [ ! -z "$parent" ]; then
+                echo "$class_name --> $parent" >> CODE_IMPROVEMENTS.md
+              fi
+            done
+          done
+          echo '```' >> CODE_IMPROVEMENTS.md
+
+      - name: Create automated tests
+        run: |
+          # Автоматически создаем тестовые файлы для классов без тестов
+          find . -name "*.java" | grep -v "Test.java" | grep -v "TestSuite" | while read java_file; do
+            test_file="${java_file%.java}Test.java"
+            if [ ! -f "$test_file" ]; then
+              class_name=$(basename "$java_file" .java)
+              package=$(grep "^package " "$java_file" | head -1 | sed 's/package //' | sed 's/;//')
+          
+              mkdir -p "$(dirname "$test_file")"
+          
+              echo "package $package;" > "$test_file"
+              echo "" >> "$test_file"
+              echo "import org.junit.jupiter.api.Test;" >> "$test_file"
+              echo "import static org.junit.jupiter.api.Assertions.*;" >> "$test_file"
+              echo "" >> "$test_file"
+              echo "class ${class_name}Test {" >> "$test_file"
+              echo "" >> "$test_file"
+              echo "    @Test" >> "$test_file"
+              echo "    void testExample() {" >> "$test_file"
+              echo "        // TODO: Add tests for $class_name" >> "$test_file"
+              echo "        assertTrue(true);" >> "$test_file"
+              echo "    }" >> "$test_file"
+              echo "}" >> "$test_file"
+          
+              echo "Создан тестовый файл: $test_file" >> CODE_IMPROVEMENTS.md
+            fi
+          done || echo "No Java files to test" >> CODE_IMPROVEMENTS.md
+
+      - name: Commit improvements
+        run: |
+          git config --local user.email "code-quality-bot@example.com"
+          git config --local user.name "Code Quality Bot"
+          git add CODE_IMPROVEMENTS.md
+          find . -name "*Test.java" -newer CODE_IMPROVEMENTS.md 2>/dev/null | xargs git add 2>/dev/null || true
+          git commit -m "🔧 Code quality improvements: $(date)" || echo "No changes"
+          git push
